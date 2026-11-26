@@ -8,6 +8,7 @@ use App\Support\GateLogProcessor;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema; 
 use RuntimeException;
 use Throwable;
 
@@ -119,6 +120,123 @@ class GateDashboardController extends Controller
         $filterDevices = GateLog::query()->distinct()->orderBy('device_name')->pluck('device_name');
         $filterDepartments = GateLog::query()->distinct()->orderBy('department_name')->pluck('department_name');
 
+        // ====================================================================
+        // [TAMBAHAN 2] Data untuk bagian baru di view (tidak mengubah kode di atas)
+        // ====================================================================
+        $table = (new GateLog)->getTable();
+
+        // Kolom opsional: dicari otomatis. Ubah daftarnya kalau nama kolommu beda.
+        $vCol = $this->firstColumn(['verify_mode', 'verification_mode', 'verify_type', 'verification']);
+        $mCol = $this->firstColumn(['merged_count', 'tap_count', 'jumlah_tap']);
+        $mergedExpr = $mCol ?: '1';
+        $gandaRow  = (clone $base)->selectRaw("COALESCE(SUM($mergedExpr), 0) AS mentah, COUNT(*) AS bersih")->first();
+        $tapMentah = $mCol ? (int) $gandaRow->mentah : null;
+        $tapGanda  = $mCol ? max((int) $gandaRow->mentah - (int) $gandaRow->bersih, 0) : null;
+
+        // A. Kartu analisa tiap gate
+        $grandTotal = max((int) $kpi->total, 1);
+        $perGate = (clone $base)
+            ->selectRaw("device_name, $hourExpr AS h, COUNT(*) AS c")
+            ->groupBy('device_name')->groupByRaw($hourExpr)
+            ->get()
+            ->groupBy('device_name');
+
+        $gateCards = $perGate->map(function ($rows, $name) use ($grandTotal) {
+            $total  = (int) $rows->sum('c');
+            $sorted = $rows->sortByDesc('c')->values();
+            $mk = fn ($r) => $r ? [
+                'h'   => (int) $r->h,
+                'c'   => (int) $r->c,
+                'pct' => round($r->c / max($total, 1) * 100, 1),
+            ] : null;
+
+            return [
+                'name'  => (string) $name,
+                'arah'  => preg_match('/(out|keluar)/i', (string) $name) ? 'out' : 'in',
+                'total' => $total,
+                'share' => round($total / $grandTotal * 100, 1),
+                'peak'  => $mk($sorted[0]),
+                'peak2' => $mk($sorted[1] ?? null),
+            ];
+        })->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)->values()->all();
+
+        // B. Metode verifikasi
+        if ($vCol) {
+            $verifikasi = (clone $base)
+                ->selectRaw("CASE WHEN LOWER($vCol) LIKE '%face%' THEN 'Face'
+                                  WHEN LOWER($vCol) LIKE '%card%' THEN 'Only Card'
+                                  ELSE 'Other' END AS m, COUNT(*) AS c")
+                ->groupBy('m')->pluck('c', 'm');
+        } else {
+            $verifikasi = collect();
+        }
+
+        // C. Rasio redundansi sensor per gate
+        $redundansi = (clone $base)
+            ->selectRaw("device_name, SUM($mergedExpr) * 1.0 / COUNT(*) AS r")
+            ->groupBy('device_name')->orderBy('device_name')
+            ->pluck('r', 'device_name')
+            ->map(fn ($v) => (float) $v);
+
+        // D. Tap keluar terakhir per pegawai per hari pada rentang jam
+        $jam = max(0, min(23, (int) $request->input('jam', 16)));
+        $lastSub = (clone $base)
+            ->where('direction', 'Keluar')
+            ->whereNotNull('personnel_id')
+            ->whereRaw("$hourExpr = ?", [$jam])
+            ->selectRaw('personnel_id, MAX(tap_time) AS last_time')
+            ->groupBy('personnel_id')->groupByRaw($dateExpr);
+
+        $lastOut = GateLog::query()
+            ->joinSub($lastSub, 'l', function ($j) use ($table) {
+                $j->on("$table.personnel_id", '=', 'l.personnel_id')
+                  ->on("$table.tap_time", '=', 'l.last_time');
+            })
+            ->where("$table.direction", 'Keluar')
+            ->select("$table.*")
+            ->orderByDesc("$table.tap_time")
+            ->paginate(15, ['*'], 'out_page')->withQueryString();
+
+        // E. Log eksepsi: non-standar, kartu khusus, redundansi >= 10 tap
+        $eks = in_array($request->input('eks'), ['kartu', 'redundansi', 'standar'], true) ? $request->input('eks') : null;
+        $cardOnly = $vCol ? "(LOWER($vCol) LIKE '%card%' AND LOWER($vCol) NOT LIKE '%face%')" : null;
+
+        $exQuery = (clone $base)->where(function ($q) use ($normal, $cardOnly, $mCol) {
+            $q->where('event_description', '<>', $normal);
+            if ($cardOnly) { $q->orWhereRaw($cardOnly); }
+            if ($mCol)     { $q->orWhere($mCol, '>=', 10); }
+        });
+        if ($eks === 'kartu' && $cardOnly)  { $exQuery->whereRaw($cardOnly); }
+        if ($eks === 'redundansi' && $mCol) { $exQuery->where($mCol, '>=', 10); }
+        if ($eks === 'standar')             { $exQuery->where('event_description', '<>', $normal); }
+
+        $exCount = (clone $exQuery)->count();
+        $exLog = $exQuery->orderByDesc('tap_time')->limit(100)->get()->each(function ($e) use ($vCol, $mCol) {
+            $mode = $vCol ? strtolower((string) $e->{$vCol}) : '';
+            $e->verify_mode  = $vCol ? $e->{$vCol} : '-';
+            $e->merged_count = $mCol ? (int) $e->{$mCol} : 1;
+            $e->kategori = $e->merged_count >= 10 ? 'Anomali Redundansi'
+                : (str_contains($mode, 'card') && ! str_contains($mode, 'face') ? 'Kartu Khusus' : 'Event Non-Standar');
+        });
+
+        // F. Riwayat transaksi detail (+ pencarian ID / nama)
+        $q = mb_substr(trim((string) $request->input('q')), 0, 100);
+        $history = (clone $base)
+            ->when($q !== '', fn ($x) => $x->where(fn ($w) => $w
+                ->where('personnel_id', 'like', "%$q%")
+                ->orWhere('full_name', 'like', "%$q%")))
+            ->orderByDesc('tap_time')
+            ->paginate(20, ['*'], 'log_page')->withQueryString();
+
+        // Properti virtual supaya view seragam walau nama kolom berbeda
+        foreach ([$lastOut, $history] as $paginator) {
+            $paginator->getCollection()->each(function ($r) use ($vCol, $mCol) {
+                $r->verify_mode  = $vCol ? $r->{$vCol} : '-';
+                $r->merged_count = $mCol ? (int) $r->{$mCol} : 1;
+            });
+        }
+        // ==================== akhir [TAMBAHAN 2] ====================
+
         return view('gate-dashboard', compact(
             'kpi',
             'lainnya',
@@ -130,7 +248,19 @@ class GateDashboardController extends Controller
             'exceptions',
             'filterDates',
             'filterDevices',
-            'filterDepartments'
+            'filterDepartments',
+            'gateCards',
+            'verifikasi',
+            'redundansi',
+            'jam',
+            'lastOut',
+            'eks',
+            'exCount',
+            'exLog',
+            'q',
+            'history',
+            'tapGanda',
+            'tapMentah'
         ));
     }
 
@@ -191,6 +321,126 @@ class GateDashboardController extends Controller
         }
 
         return redirect()->route('gate.dashboard')->with('success', $message);
+    }
+
+    public function clear(Request $request)
+    {
+        $request->validate([
+            'clear_password' => ['required', 'string'],
+        ]);
+
+        $expected = (string) config('gate.clear_password');
+        if ($expected === '') {
+            return back()->withErrors(['clear_password' => 'GATE_CLEAR_PASSWORD belum diatur di file .env.']);
+        }
+        if (! hash_equals($expected, (string) $request->input('clear_password'))) {
+            return back()->withErrors(['clear_password' => 'Kata sandi clear salah.']);
+        }
+
+        GateLog::query()->delete();
+
+        return redirect()->route('gate.dashboard')->with('success', 'Semua data log gate berhasil dihapus.');
+    }
+
+    /** Export riwayat detail / tap-out terakhir: csv, xlsx (openspout), pdf (dompdf). */
+    public function export(Request $request, string $format)
+    {
+        abort_unless(in_array($format, ['csv', 'xlsx', 'pdf'], true), 404);
+
+        $vCol = $this->firstColumn(['verify_mode', 'verification_mode', 'verify_type', 'verification']);
+        $mCol = $this->firstColumn(['merged_count', 'tap_count', 'jumlah_tap']);
+
+        $query = GateLog::query();
+        if ($request->filled('date') && preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $request->input('date'))) {
+            $day = Carbon::createFromFormat('Y-m-d', $request->input('date'));
+            $query->whereBetween('tap_time', [$day->copy()->startOfDay(), $day->copy()->endOfDay()]);
+        }
+        if ($request->filled('device')) {
+            $query->where('device_name', $request->input('device'));
+        }
+        if ($request->filled('department')) {
+            $query->where('department_name', $request->input('department'));
+        }
+
+        $q = mb_substr(trim((string) $request->input('q')), 0, 100);
+        if ($q !== '') {
+            $query->where(fn ($w) => $w->where('personnel_id', 'like', "%$q%")->orWhere('full_name', 'like', "%$q%"));
+        }
+        if ($request->input('jenis') === 'last-out') {
+            $query->where('direction', 'Keluar')
+                  ->whereRaw($this->hourExpr() . ' = ?', [max(0, min(23, (int) $request->input('jam', 16)))]);
+        }
+        $query->orderBy('tap_time');
+
+        $header = ['Waktu', 'Gate', 'Personnel ID', 'Nama', 'Unit', 'Mode', 'Status', 'Jml Tap'];
+        $toRow = fn ($r) => [
+            (string) $r->tap_time, (string) $r->device_name, (string) $r->personnel_id, (string) $r->full_name,
+            (string) $r->department_name, $vCol ? (string) $r->{$vCol} : '-', (string) $r->event_description,
+            $mCol ? (int) $r->{$mCol} : 1,
+        ];
+        $fileBase = 'log-gate-' . now()->format('Ymd-His');
+
+        // ---------- XLSX  ----------
+        if ($format === 'xlsx') {
+            if (! class_exists(\OpenSpout\Writer\XLSX\Writer::class)) {
+                return back()->withErrors(['log_file' => 'Export Excel butuh paket. Jalankan: composer require openspout/openspout']);
+            }
+            set_time_limit(0);
+
+            return response()->streamDownload(function () use ($query, $header, $toRow) {
+                $writer = new \OpenSpout\Writer\XLSX\Writer();
+                $writer->openToFile('php://output');
+                $writer->addRow(\OpenSpout\Common\Entity\Row::fromValues($header));
+                foreach ($query->lazy(2000) as $r) {
+                    $writer->addRow(\OpenSpout\Common\Entity\Row::fromValues($toRow($r)));
+                }
+                $writer->close();
+            }, $fileBase . '.xlsx', [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ]);
+        }
+
+        // ---------- PDF ----------
+        if ($format === 'pdf') {
+            if (! class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {
+                return back()->withErrors(['log_file' => 'Export PDF butuh paket. Jalankan: composer require barryvdh/laravel-dompdf']);
+            }
+            $limit = 500;
+            set_time_limit(0);
+            @ini_set('memory_limit', '1024M');
+            $total = (clone $query)->count();
+            $rows = $query->limit($limit)->get()->map($toRow);
+
+            return \Barryvdh\DomPDF\Facade\Pdf::loadView('gate-export', [
+                'header' => $header,
+                'rows'   => $rows,
+                'total'  => $total,
+                'limit'  => $limit,
+            ])->setPaper('a4', 'landscape')->download($fileBase . '.pdf');
+        }
+
+        // ---------- CSV ----------
+        return response()->streamDownload(function () use ($query, $header, $toRow) {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF"); // BOM agar Excel membaca UTF-8
+            fputcsv($out, $header);
+            foreach ($query->lazy(2000) as $r) {
+                fputcsv($out, $toRow($r));
+            }
+            fclose($out);
+        }, $fileBase . '.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    /** Cari nama kolom pertama yang benar-benar ada di tabel (null kalau tidak ada). */
+    private function firstColumn(array $candidates): ?string
+    {
+        $table = (new GateLog)->getTable();
+        foreach ($candidates as $c) {
+            if (Schema::hasColumn($table, $c)) {
+                return $c;
+            }
+        }
+        return null;
     }
 
     /** Ekspresi SQL "tanggal dari tap_time" sesuai driver database. */

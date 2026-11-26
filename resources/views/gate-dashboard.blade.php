@@ -18,169 +18,11 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Access Get Log</title>
+    <link rel="icon" type="image/png" href="{{ asset('favicon-kemenkeu.png') }}?v=1">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --navy: #0b1f3a;
-            --navy-2: #142d4f;
-            --navy-line: #27456e;
-            --paper: #eef2f7;
-            --panel: #ffffff;
-            --ink: #0f1c2e;
-            --muted: #5a6b82;
-            --line: #d6dee9;
-            --in: #0b8a63;
-            --in-soft: #d9f2e9;
-            --out: #d9560b;
-            --out-soft: #fde6d8;
-            --signal: #ffc93c;
-            --bad: #b4231a;
-            --bad-soft: #fde4e1;
-        }
-        * { box-sizing: border-box; }
-        html { color-scheme: light; }
-        body {
-            margin: 0; background: var(--paper); color: var(--ink);
-            font-family: "Archivo", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-            font-size: 14.5px; line-height: 1.5;
-        }
-        .num { font-variant-numeric: tabular-nums; }
-        :focus-visible { outline: 3px solid var(--signal); outline-offset: 2px; }
-
-        /* ---------- Kerangka: panel kiri + area utama selebar layar ---------- */
-        .app { display: grid; grid-template-columns: 300px minmax(0, 1fr); min-height: 100vh; }
-
-        .side {
-            background: var(--navy); color: #dbe6f5; padding: 24px 22px 32px;
-            position: sticky; top: 0; height: 100vh; overflow-y: auto;
-        }
-        .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
-        .brand-mark {
-            width: 40px; height: 40px; border-radius: 8px; background: var(--signal);
-            display: grid; place-items: center; flex: none;
-        }
-        .brand-name { font-weight: 800; font-size: 18px; line-height: 1.1; color: #fff; letter-spacing: -.01em; }
-        .brand-sub { font-size: 12.5px; color: #9db3d1; }
-
-        .side h2 { font-size: 15px; font-weight: 700; color: #fff; margin: 0 0 12px; }
-        .side-block { padding-top: 22px; margin-top: 22px; border-top: 1px solid var(--navy-line); }
-        .side label { display: block; font-size: 13px; color: #b7c8e0; margin-bottom: 14px; }
-        .side select, .side input[type=password] {
-            display: block; width: 100%; margin-top: 5px; padding: 9px 10px; font: inherit; color: #fff;
-            background: var(--navy-2); border: 1px solid var(--navy-line); border-radius: 6px;
-        }
-        .side select option { color: #0f1c2e; background: #fff; }
-
-        .drop {
-            display: block; margin: 0 0 14px; padding: 16px 14px; text-align: center; cursor: pointer;
-            border: 2px dashed var(--navy-line); border-radius: 8px; color: #dbe6f5;
-            transition: border-color .15s, background .15s;
-        }
-        .drop:hover, .drop.has-file { border-color: var(--signal); background: rgba(255, 201, 60, .07); }
-        .drop strong { display: block; color: #fff; font-size: 14px; }
-        .drop small { color: #9db3d1; font-size: 12.5px; word-break: break-all; }
-        .drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
-        .drop:focus-within { outline: 3px solid var(--signal); outline-offset: 2px; }
-
-        .check { display: flex !important; align-items: center; gap: 8px; }
-        .check input { width: 16px; height: 16px; accent-color: var(--signal); }
-
-        .btn {
-            display: inline-block; width: 100%; padding: 10px 14px; font: inherit; font-weight: 700;
-            text-align: center; text-decoration: none; border-radius: 6px; cursor: pointer; border: 0;
-            background: var(--signal); color: var(--navy);
-        }
-        .btn:hover { background: #ffd65f; }
-        .btn.line { background: transparent; color: #dbe6f5; border: 1px solid var(--navy-line); margin-top: 8px; font-weight: 600; }
-        .btn.line:hover { border-color: #dbe6f5; background: transparent; }
-        .hint { font-size: 12.5px; color: #9db3d1; margin: 12px 0 0; }
-
-        /* ---------- Area utama ---------- */
-        .main { padding: 28px clamp(20px, 3vw, 44px) 56px; min-width: 0; }
-        .top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8px 24px; margin-bottom: 22px; }
-        h1 { margin: 0; font-size: clamp(26px, 3vw, 36px); font-weight: 800; letter-spacing: -.02em; line-height: 1.1; }
-        .range { color: var(--muted); margin: 4px 0 0; }
-        .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-        .chip { background: var(--navy); color: #fff; font-size: 13px; padding: 3px 10px; border-radius: 99px; }
-
-        .alert { padding: 11px 16px; border-radius: 6px; margin-bottom: 18px; border-left: 5px solid; background: #fff; }
-        .alert.ok { border-color: var(--in); background: var(--in-soft); }
-        .alert.err { border-color: var(--bad); background: var(--bad-soft); color: #7a150f; }
-        .alert.warn { border-color: var(--signal); background: #fff6d6; color: #5c4400; }
-
-        /* Pita arus: elemen utama halaman */
-        .flow { display: flex; border-radius: 8px; overflow: hidden; color: #fff; margin-bottom: 18px; }
-        .flow > div { padding: 22px 28px 24px; min-width: 190px; }
-        .flow-in  { flex: 1 1 calc(var(--m) * 1%);  background: var(--in);  animation: grow-in .9s cubic-bezier(.2, .7, .2, 1); }
-        .flow-out { flex: 1 1 calc(var(--k) * 1%);  background: var(--out); animation: grow-out .9s cubic-bezier(.2, .7, .2, 1); text-align: right; }
-        .flow-name { font-size: 17px; font-weight: 700; opacity: .95; }
-        .flow-big {
-            display: block; font-size: clamp(48px, 8vw, 104px); line-height: .95; font-weight: 800;
-            font-stretch: 72%; letter-spacing: -.02em; margin: 6px 0 4px; font-variant-numeric: tabular-nums;
-        }
-        .flow-note { font-size: 14px; opacity: .92; }
-        @keyframes grow-in  { from { flex-basis: 50%; } }
-        @keyframes grow-out { from { flex-basis: 50%; } }
-
-        /* Strip ringkasan */
-        .strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 18px; }
-        .strip > div { padding: 16px 20px; border-right: 1px solid var(--line); }
-        .strip > div:last-child { border-right: 0; }
-        .strip .k { color: var(--muted); font-size: 13px; }
-        .strip .v { font-size: 30px; font-weight: 800; font-stretch: 80%; line-height: 1.15; letter-spacing: -.01em; }
-        .strip .s { color: var(--muted); font-size: 13px; }
-        .v.bad { color: var(--bad); }
-
-        /* Panel dan grid 12 kolom */
-        .grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 18px; margin-bottom: 18px; }
-        .c4 { grid-column: span 4; } .c5 { grid-column: span 5; } .c6 { grid-column: span 6; }
-        .c7 { grid-column: span 7; } .c8 { grid-column: span 8; } .c12 { grid-column: span 12; }
-        .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px 20px; min-width: 0; }
-        .panel h3 { margin: 0; font-size: 16.5px; font-weight: 700; letter-spacing: -.005em; }
-        .panel .desc { margin: 2px 0 14px; color: var(--muted); font-size: 13.5px; }
-        .chart { position: relative; height: 290px; }
-
-        /* Daftar departemen dengan batang */
-        .bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-        .bars li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; align-items: baseline; }
-        .bars .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .bars .ct { font-weight: 700; }
-        .bars .bar { grid-column: 1 / -1; height: 8px; background: var(--paper); border-radius: 4px; overflow: hidden; }
-        .bars .bar i { display: block; height: 100%; background: var(--navy); border-radius: 4px; }
-
-        /* Tabel */
-        .scroll { overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
-        th { font-size: 13px; font-weight: 600; color: var(--muted); white-space: nowrap; }
-        tbody tr:hover { background: #f6f9fc; }
-        td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
-        .sub { display: block; color: var(--muted); font-size: 12.5px; }
-        .pill { display: inline-block; padding: 1px 9px; border-radius: 99px; font-size: 12.5px; font-weight: 600; background: var(--bad-soft); color: var(--bad); }
-        .in-t { color: var(--in); font-weight: 700; } .out-t { color: var(--out); font-weight: 700; }
-        .muted { color: var(--muted); }
-
-        /* Keadaan kosong */
-        .empty { background: var(--panel); border: 2px dashed var(--line); border-radius: 8px; padding: 56px 28px; text-align: center; }
-        .empty h2 { margin: 0 0 6px; font-size: 24px; font-weight: 800; letter-spacing: -.01em; }
-        .empty p { margin: 0 auto; max-width: 52ch; color: var(--muted); }
-
-        @media (max-width: 1180px) { .c4, .c5, .c6, .c7, .c8 { grid-column: span 12; } }
-        @media (max-width: 900px) {
-            .app { grid-template-columns: 1fr; }
-            .side { position: static; height: auto; }
-            .flow { flex-direction: column; }
-            .flow > div { flex: none !important; animation: none !important; }
-            .flow-out { text-align: left; }
-            .strip > div { border-right: 0; border-bottom: 1px solid var(--line); }
-        }
-        @media (prefers-reduced-motion: reduce) {
-            .flow-in, .flow-out { animation: none; }
-            * { transition: none !important; }
-        }
-    </style>
+    <link rel="stylesheet" href="{{ asset('css/gate-dashboard.css') }}">
 </head>
 <body>
 <div class="app">
@@ -251,6 +93,20 @@
             </form>
             <p class="hint">Tap ganda dari orang, gate, dan event yang sama dalam kurang dari 5 detik digabung menjadi satu. File besar bisa butuh beberapa menit.</p>
         </div>
+
+        @if (\Illuminate\Support\Facades\Route::has('gate.clear'))
+        <div class="side-block">
+            <h2>Kosongkan data</h2>
+            <form method="POST" action="{{ route('gate.clear') }}" onsubmit="return confirm('Hapus SEMUA data log? Tindakan ini tidak bisa dibatalkan.')">
+                @csrf
+                <label>Kata sandi clear
+                    <input type="password" name="clear_password" autocomplete="off" required>
+                </label>
+                <button class="btn danger" type="submit">Clear semua data</button>
+            </form>
+            <p class="hint">Menghapus seluruh data di dashboard. Setelah itu kamu bisa upload dari awal lagi.</p>
+        </div>
+        @endif
     </aside>
 
     {{-- ================= Area utama ================= --}}
@@ -340,6 +196,17 @@
                     <div class="v num bad">{{ number_format($kpi->exceptions) }}</div>
                     <div class="s num">{{ $exPct }}% dari total tap</div>
                 </div>
+                {{-- <div>
+                    <div class="k">Tap ganda</div>
+                    <div class="v num bad">{{ $tapGanda !== null ? number_format($tapGanda) : '-' }}</div>
+                    <div class="s num">
+                        @if ($tapGanda === null)
+                            kolom jumlah tap tidak ditemukan
+                        @else
+                            {{ $tapMentah > 0 ? round($tapGanda / $tapMentah * 100, 1) : 0 }}% dari {{ number_format($tapMentah) }} tap mentah
+                        @endif
+                    </div>
+                </div> --}}
             </section>
 
             {{-- Tren --}}
@@ -407,32 +274,255 @@
                 </div>
             </section>
 
-            <section class="grid">
-                <div class="panel c12">
-                    <h3>Eksepsi terbaru</h3>
-                    <p class="desc">50 tap terakhir yang tidak berstatus {{ \App\Support\GateLogProcessor::NORMAL_EVENT }}, misalnya kartu kedaluwarsa atau tidak terdaftar.</p>
-                    <div class="scroll">
-                        <table>
-                            <thead><tr>
-                                <th>Waktu</th><th>Gate</th><th>Event</th><th>Nama</th><th>Departemen</th>
-                            </tr></thead>
-                            <tbody>
-                            @forelse ($exceptions as $e)
-                                <tr>
-                                    <td class="num" style="white-space:nowrap">{{ $e->tap_time->format('Y-m-d H:i:s') }}</td>
-                                    <td>{{ $e->device_name }}</td>
-                                    <td><span class="pill">{{ $e->event_description }}</span>@if ($e->event_level)<span class="sub">{{ $e->event_level }}</span>@endif</td>
-                                    <td>{{ $e->full_name }}</td>
-                                    <td>{{ $e->department_name }}</td>
-                                </tr>
-                            @empty
-                                <tr><td colspan="5" class="muted">Tidak ada eksepsi pada data ini.</td></tr>
-                            @endforelse
-                            </tbody>
-                        </table>
+            {{-- ======== Bagian tambahan (analisa gate, verifikasi, tap out terakhir, eksepsi, riwayat) ======== --}}
+            @php
+    $keep = request()->except(['jam', 'out_page', 'eks', 'q', 'log_page']);
+    $vTotal = max((int) $verifikasi->sum(), 1);
+    $vFace  = round(($verifikasi['Face'] ?? 0) / $vTotal * 100, 2);
+    $vCard  = round(($verifikasi['Only Card'] ?? 0) / $vTotal * 100, 2);
+    $vOther = max(round(100 - $vFace - $vCard, 2), 0);
+    $inCards  = collect($gateCards)->where('arah', 'in')->sortByDesc('total')->values();
+    $outCards = collect($gateCards)->where('arah', 'out')->sortByDesc('total')->values();
+    $fmtJam = fn ($h) => sprintf('%02d:00 - %02d:59 WIB', $h, $h);
+@endphp
+
+
+
+{{-- ============ 1. Analisa singkat trafik & jam puncak tiap gate ============ --}}
+<section class="grid">
+    <div class="panel c12">
+        <div class="panel-head">
+            <div>
+                <h3>Analisa Singkat Trafik &amp; Jam Puncak Setiap Gate <span class="badge-n">{{ count($gateCards) }} Gate</span></h3>
+                <p class="desc">Ringkasan waktu tap terbanyak (peak hour) untuk gate In maupun Out pada setiap perangkat.</p>
+            </div>
+            <div class="toolbar">
+                <select id="fArah" aria-label="Filter arah">
+                    <option value="">Semua Arah (Gate In &amp; Gate Out)</option>
+                    <option value="in">Gate In saja</option>
+                    <option value="out">Gate Out saja</option>
+                </select>
+                <select id="fGate" aria-label="Filter unit gate">
+                    <option value="">Semua Unit Gate ({{ count($gateCards) }})</option>
+                    @foreach ($gateCards as $g)<option value="{{ $g['name'] }}">{{ $g['name'] }}</option>@endforeach
+                </select>
+            </div>
+        </div>
+
+        <div class="gcards">
+            @foreach ($gateCards as $g)
+                <div class="gcard {{ $g['arah'] }}" data-arah="{{ $g['arah'] }}" data-gate="{{ $g['name'] }}">
+                    <div class="gcard-head">
+                        <strong>{{ $g['name'] }}</strong>
+                        <span class="tag">{{ $g['arah'] === 'in' ? 'Gate Masuk (In)' : 'Gate Keluar (Out)' }}</span>
+                    </div>
+                    <div class="peak">
+                        <div class="l">Waktu Tap Terbanyak (Peak Hour)</div>
+                        <div class="row">
+                            <span class="big num">{{ $fmtJam($g['peak']['h']) }}</span>
+                            <span class="num">{{ number_format($g['peak']['c']) }} tap ({{ $g['peak']['pct'] }}%)</span>
+                        </div>
+                        @if ($g['peak2'])
+                            <div class="l num">Puncak ke-2: <strong>{{ $fmtJam($g['peak2']['h']) }}</strong> ({{ number_format($g['peak2']['c']) }} tap)</div>
+                        @endif
+                    </div>
+                    <div class="foot num">
+                        <span>Total Beban: <strong>{{ number_format($g['total']) }}</strong> tx ({{ $g['share'] }}%)</span>
                     </div>
                 </div>
-            </section>
+            @endforeach
+        </div>
+
+        <div class="sum-box">
+            <strong>Ringkasan Analisa Trafik Gate:</strong>
+            <ul class="num">
+                @if ($inCards->count())
+                    <li><strong>Trafik Gate Masuk (In):</strong> jalur masuk terpadat adalah <strong>{{ $inCards[0]['name'] }}</strong>
+                        ({{ number_format($inCards[0]['total']) }} transaksi, puncak pada {{ $fmtJam($inCards[0]['peak']['h']) }} sebanyak {{ number_format($inCards[0]['peak']['c']) }} tap)
+                        @if ($inCards->count() > 1), diikuti <strong>{{ $inCards[1]['name'] }}</strong> ({{ number_format($inCards[1]['total']) }} transaksi, puncak pada {{ $fmtJam($inCards[1]['peak']['h']) }} sebanyak {{ number_format($inCards[1]['peak']['c']) }} tap)@endif.
+                    </li>
+                @endif
+                @if ($outCards->count())
+                    <li><strong>Trafik Gate Keluar (Out):</strong> jalur keluar terpadat adalah <strong>{{ $outCards[0]['name'] }}</strong>
+                        ({{ number_format($outCards[0]['total']) }} transaksi, puncak pada {{ $fmtJam($outCards[0]['peak']['h']) }} sebanyak {{ number_format($outCards[0]['peak']['c']) }} tap)
+                        @if ($outCards->count() > 1), diikuti <strong>{{ $outCards[1]['name'] }}</strong> ({{ number_format($outCards[1]['total']) }} transaksi, puncak pada {{ $fmtJam($outCards[1]['peak']['h']) }} sebanyak {{ number_format($outCards[1]['peak']['c']) }} tap)@endif.
+                    </li>
+                @endif
+            </ul>
+        </div>
+    </div>
+</section>
+
+{{-- ============ 2. Metode verifikasi & rasio redundansi sensor ============ --}}
+<section class="grid">
+    <div class="panel c6">
+        <h3>Metode Verifikasi &amp; Rasio Akses</h3>
+        <p class="desc">Proporsi Face Recognition vs Kartu Akses.</p>
+        <div class="donut-wrap">
+            <div class="donut" role="img" aria-label="Face {{ $vFace }}%, Only Card {{ $vCard }}%, Other {{ $vOther }}%"
+                 style="background: conic-gradient(var(--in) 0 {{ $vFace }}%, var(--signal) {{ $vFace }}% {{ $vFace + $vCard }}%, #6366f1 {{ $vFace + $vCard }}% 100%);"></div>
+            <ul class="donut-leg num">
+                <li><i style="background:var(--in)"></i>Face: <strong>{{ number_format($verifikasi['Face'] ?? 0) }}</strong> ({{ $vFace }}%)</li>
+                <li><i style="background:var(--signal)"></i>Only Card: <strong>{{ number_format($verifikasi['Only Card'] ?? 0) }}</strong> ({{ $vCard }}%)</li>
+                <li><i style="background:#6366f1"></i>Other: <strong>{{ number_format($verifikasi['Other'] ?? 0) }}</strong> ({{ $vOther }}%)</li>
+            </ul>
+        </div>
+    </div>
+    <div class="panel c6">
+        <h3>Rasio Redundansi Sensor per Gate</h3>
+        <p class="desc">Rata-rata tap mentah per transaksi bersih. Makin tinggi, makin banyak tap ganda yang digabung.</p>
+        <ul class="ratio">
+            @foreach ($redundansi as $name => $r)
+                <li><span>{{ $name }}</span><span>{{ number_format($r, 2) }}x tap/tx</span></li>
+            @endforeach
+        </ul>
+    </div>
+</section>
+
+{{-- ============ 3. Daftar pegawai tap gate out terakhir per rentang jam ============ --}}
+<section class="grid">
+    <div class="panel c12" id="last-out">
+        <div class="panel-head">
+            <div>
+                <h3>Daftar Pegawai Tap Gate Out Terakhir (Pukul {{ sprintf('%02d:00 - %02d:59', $jam, $jam) }})
+                    <span class="badge-n num">{{ number_format($lastOut->total()) }} Catatan Pegawai</span></h3>
+                <p class="desc">Tap keluar (Gate Out) paling akhir dalam sehari per pegawai yang terjadi pada rentang jam ini, sesuai filter aktif.</p>
+            </div>
+            <form method="GET" action="{{ route('gate.dashboard') }}" class="toolbar">
+                @foreach ($keep as $k => $v)<input type="hidden" name="{{ $k }}" value="{{ $v }}">@endforeach
+                <select name="jam" onchange="this.form.submit()" aria-label="Rentang jam">
+                    @for ($h = 0; $h < 24; $h++)
+                        <option value="{{ $h }}" @selected($jam === $h)>Rentang Jam {{ sprintf('%02d:00 - %02d:59', $h, $h) }}</option>
+                    @endfor
+                </select>
+                <a class="btnx xl" href="{{ route('gate.export', ['format' => 'xlsx', 'jenis' => 'last-out', 'jam' => $jam] + $keep) }}">Export Excel</a>
+            </form>
+        </div>
+        <div class="scroll">
+            <table>
+                <thead><tr><th>No</th><th>Tanggal</th><th>Waktu Tap Out Terakhir</th><th>Perangkat Gate Out</th><th>Personnel ID</th><th>Nama Pegawai</th><th>Unit Organisasi</th><th>Mode Verifikasi</th></tr></thead>
+                <tbody>
+                @forelse ($lastOut as $i => $r)
+                    <tr>
+                        <td class="num">{{ $lastOut->firstItem() + $i }}</td>
+                        <td class="mono">{{ $r->tap_time->format('Y-m-d') }}</td>
+                        <td class="mono">{{ $r->tap_time->format('H:i:s') }}</td>
+                        <td>{{ $r->device_name }}</td>
+                        <td class="mono">{{ $r->personnel_id }}</td>
+                        <td>{{ $r->full_name }}</td>
+                        <td>{{ $r->department_name }}</td>
+                        <td>{{ $r->verify_mode }}</td>
+                    </tr>
+                @empty
+                    <tr><td colspan="8" class="muted">Tidak ada tap keluar pada rentang jam ini.</td></tr>
+                @endforelse
+                </tbody>
+            </table>
+        </div>
+        <div class="pager num">
+            <span>Menampilkan {{ $lastOut->firstItem() ?? 0 }} - {{ $lastOut->lastItem() ?? 0 }} dari {{ number_format($lastOut->total()) }} catatan pegawai</span>
+            <span>
+                @if ($lastOut->onFirstPage())<span class="dis">Prev</span>@else<a href="{{ $lastOut->previousPageUrl() }}#last-out">Prev</a>@endif
+                Hal {{ $lastOut->currentPage() }} / {{ $lastOut->lastPage() }}
+                @if ($lastOut->hasMorePages())<a href="{{ $lastOut->nextPageUrl() }}#last-out">Next</a>@else<span class="dis">Next</span>@endif
+            </span>
+        </div>
+    </div>
+</section>
+
+{{-- ============ 4. Log eksepsi & status perangkat (gantikan section "Eksepsi terbaru" lama) ============ --}}
+<section class="grid">
+    <div class="panel c12">
+        <div class="panel-head">
+            <div>
+                <h3>Log Eksepsi &amp; Status Perangkat <span class="badge-n bad num">{{ number_format($exCount) }} Kejadian</span></h3>
+                <p class="desc">Sampel kejadian non-standar, akses kartu khusus, dan anomali redundansi tap (≥10 tap dalam &lt;5 detik).</p>
+            </div>
+            <form method="GET" action="{{ route('gate.dashboard') }}" class="toolbar">
+                @foreach ($keep as $k => $v)<input type="hidden" name="{{ $k }}" value="{{ $v }}">@endforeach
+                <select name="eks" onchange="this.form.submit()" aria-label="Kategori eksepsi">
+                    <option value="">Semua Kejadian Non-Standar &amp; Gangguan</option>
+                    <option value="kartu" @selected($eks === 'kartu')>Kartu Khusus</option>
+                    <option value="redundansi" @selected($eks === 'redundansi')>Anomali Redundansi</option>
+                    <option value="standar" @selected($eks === 'standar')>Event Non-Standar</option>
+                </select>
+            </form>
+        </div>
+        <div class="scroll" style="max-height: 420px; overflow-y: auto;">
+            <table>
+                <thead><tr><th>Waktu Kejadian</th><th>Perangkat Gate</th><th>Kategori / Status</th><th>Deskripsi Event</th><th>Personnel ID</th><th>Nama / Keterangan</th><th>Unit Organisasi</th><th class="r">Tap Digabung</th></tr></thead>
+                <tbody>
+                @forelse ($exLog as $e)
+                    <tr>
+                        <td class="mono" style="white-space:nowrap">{{ $e->tap_time->format('Y-m-d H:i:s') }}</td>
+                        <td>{{ $e->device_name }}</td>
+                        <td><span class="cat {{ $e->kategori === 'Anomali Redundansi' ? 'red' : ($e->kategori === 'Event Non-Standar' ? 'std' : '') }}">{{ $e->kategori }}</span></td>
+                        <td>{{ $e->event_description }}</td>
+                        <td class="mono">{{ $e->personnel_id }}</td>
+                        <td>{{ $e->full_name }}</td>
+                        <td>{{ $e->department_name }}</td>
+                        <td class="r"><strong>{{ (int) $e->merged_count }}x</strong></td>
+                    </tr>
+                @empty
+                    <tr><td colspan="8" class="muted">Tidak ada kejadian pada kategori ini.</td></tr>
+                @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+{{-- ============ 5. Riwayat log transaksi detail ============ --}}
+<section class="grid">
+    <div class="panel c12" id="riwayat">
+        <div class="panel-head">
+            <div>
+                <h3>Riwayat Log Transaksi Detail</h3>
+                <p class="desc">Riwayat lintas gate sesuai filter aktif. Gunakan pencarian ID / nama untuk melacak riwayat individu.</p>
+            </div>
+            <form method="GET" action="{{ route('gate.dashboard') }}" class="toolbar" id="formRiwayat">
+                @foreach ($keep as $k => $v)<input type="hidden" name="{{ $k }}" value="{{ $v }}">@endforeach
+                <input type="search" name="q" id="qRiwayat" value="{{ $q }}" placeholder="Filter perorangan (ID / Nama)" aria-label="Cari ID atau nama" autocomplete="off">
+                <button class="btnx" type="submit">Cari</button>
+                @php $ex = ['jenis' => 'riwayat', 'q' => $q] + $keep; @endphp
+                <a class="btnx exp-link" href="{{ route('gate.export', ['format' => 'csv'] + $ex) }}">Export CSV</a>
+                <a class="btnx xl exp-link" href="{{ route('gate.export', ['format' => 'xlsx'] + $ex) }}">Export Excel</a>
+                <a class="btnx pdf exp-link" href="{{ route('gate.export', ['format' => 'pdf'] + $ex) }}">Export PDF</a>
+            </form>
+        </div>
+        <div id="riwayat-hasil">
+        <div class="scroll">
+            <table>
+                <thead><tr><th>Waktu Tap Pertama</th><th>Perangkat Gate</th><th>Unique Key (Personnel ID)</th><th>Nama Lengkap</th><th>Unit Organisasi</th><th>Mode Verifikasi</th><th>Status</th><th class="r">Jml Tap</th></tr></thead>
+                <tbody>
+                @forelse ($history as $h)
+                    <tr>
+                        <td class="mono" style="white-space:nowrap">{{ $h->tap_time->format('Y-m-d H:i:s') }}</td>
+                        <td>{{ $h->device_name }}</td>
+                        <td class="mono"><a class="pid" data-q="{{ $h->personnel_id }}" href="{{ route('gate.dashboard', ['q' => $h->personnel_id] + $keep) }}#riwayat">{{ $h->personnel_id }}</a></td>
+                        <td>{{ $h->full_name }}</td>
+                        <td>{{ $h->department_name }}</td>
+                        <td>{{ $h->verify_mode }}</td>
+                        <td>@if ($h->event_description === \App\Support\GateLogProcessor::NORMAL_EVENT)<span class="in-t">{{ $h->event_description }}</span>@else<span class="pill">{{ $h->event_description }}</span>@endif</td>
+                        <td class="r">{{ (int) $h->merged_count }}</td>
+                    </tr>
+                @empty
+                    <tr><td colspan="8" class="muted">Tidak ada transaksi yang cocok.</td></tr>
+                @endforelse
+                </tbody>
+            </table>
+        </div>
+        <div class="pager num">
+            <span>Menampilkan {{ $history->firstItem() ?? 0 }} - {{ $history->lastItem() ?? 0 }} dari {{ number_format($history->total()) }} transaksi</span>
+            <span>
+                @if ($history->onFirstPage())<span class="dis">Prev</span>@else<a href="{{ $history->previousPageUrl() }}#riwayat">Prev</a>@endif
+                Hal {{ $history->currentPage() }} / {{ number_format($history->lastPage()) }}
+                @if ($history->hasMorePages())<a href="{{ $history->nextPageUrl() }}#riwayat">Next</a>@else<span class="dis">Next</span>@endif
+            </span>
+        </div>
+        </div>{{-- /#riwayat-hasil --}}
+    </div>
+</section>
         @endif
     </main>
 </div>
@@ -448,6 +538,79 @@
             var f = input.files && input.files[0];
             name.textContent = f ? f.name : 'Format .xls, .xlsx, atau .csv';
             drop.classList.toggle('has-file', !!f);
+        });
+    })();
+
+    // Filter kartu gate (arah + unit) di sisi browser
+    (function () {
+        var a = document.getElementById('fArah'), g = document.getElementById('fGate');
+        if (!a || !g) return;
+        function apply() {
+            document.querySelectorAll('.gcard').forEach(function (c) {
+                var ok = (!a.value || c.dataset.arah === a.value) && (!g.value || c.dataset.gate === g.value);
+                c.classList.toggle('hide', !ok);
+            });
+        }
+        a.addEventListener('change', apply); g.addEventListener('change', apply);
+    })();
+
+    // Pencarian riwayat langsung (tanpa reload halaman, posisi scroll tetap)
+    (function () {
+        var form = document.getElementById('formRiwayat');
+        var input = document.getElementById('qRiwayat');
+        var box = document.getElementById('riwayat-hasil');
+        if (!form || !input || !box) return;
+
+        var timer = null, ctrl = null;
+
+        function setExportQ() {
+            document.querySelectorAll('.exp-link').forEach(function (a) {
+                var u = new URL(a.href, location.href);
+                u.searchParams.set('q', input.value.trim());
+                a.href = u.toString();
+            });
+        }
+
+        function load(url) {
+            if (ctrl) ctrl.abort();
+            ctrl = new AbortController();
+            box.style.opacity = '.55';
+            fetch(url, { signal: ctrl.signal, headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
+                .then(function (r) { return r.text(); })
+                .then(function (html) {
+                    var doc = new DOMParser().parseFromString(html, 'text/html');
+                    var fresh = doc.getElementById('riwayat-hasil');
+                    if (fresh) box.innerHTML = fresh.innerHTML;
+                    box.style.opacity = '';
+                    history.replaceState(null, '', url.split('#')[0]);
+                    setExportQ();
+                })
+                .catch(function (e) { if (e.name !== 'AbortError') box.style.opacity = ''; });
+        }
+
+        function search() {
+            var params = new URLSearchParams(new FormData(form));
+            params.delete('log_page');
+            load(form.action + '?' + params.toString());
+        }
+
+        input.addEventListener('input', function () {
+            clearTimeout(timer);
+            timer = setTimeout(search, 300);
+        });
+        form.addEventListener('submit', function (e) { e.preventDefault(); clearTimeout(timer); search(); });
+
+        // Prev/Next dan klik ID personel juga tanpa reload
+        box.addEventListener('click', function (e) {
+            var a = e.target.closest('a');
+            if (!a) return;
+            e.preventDefault();
+            if (a.classList.contains('pid')) {
+                input.value = a.dataset.q;
+                search();
+            } else {
+                load(a.href);
+            }
         });
     })();
 </script>

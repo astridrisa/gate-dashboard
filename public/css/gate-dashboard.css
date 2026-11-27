@@ -33,6 +33,15 @@ body {
     line-height: 1.5;
 }
 
+/* ---------- Sapaan di atas judul ---------- */
+.hello {
+    margin: 0 0 6px;
+    font-size: clamp(20px, 2.2vw, 26px);
+    font-weight: 700;
+    letter-spacing: -.01em;
+    color: var(--muted);
+}
+
 .num {
     font-variant-numeric: tabular-nums;
 }
@@ -902,3 +911,50 @@ th.r {
 .btn.danger:hover {
     background: #cf2e24;
 }
+
+/* ---------- Kotak akun di sidebar + lencana peran ---------- */
+.userbox {
+    margin-bottom: 22px;
+    padding: 12px 14px;
+    background: var(--navy-2);
+    border: 1px solid var(--navy-line);
+    border-radius: 8px;
+}
+
+.userbox .u-name {
+    margin-bottom: 4px;
+    font-weight: 700;
+    color: #fff;
+    word-break: break-word;
+}
+
+.userbox .u-actions {
+    display: grid;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.userbox .u-actions form {
+    margin: 0;
+}
+
+.userbox .btn.line {
+    margin-top: 0;
+}
+
+.btn.sm {
+    padding: 7px 10px;
+    font-size: 13px;
+}
+
+.role {
+    display: inline-block;
+    padding: 1px 10px;
+    font-size: 12.5px;
+    font-weight: 700;
+    border-radius: 99px;
+}
+
+.role-superadmin { background: #ffe8a3; color: #6b4a00; }
+.role-admin      { background: #d9f2e9; color: #0b6a4c; }
+.role-viewer     { background: #e3e9f1; color: #41526b; }

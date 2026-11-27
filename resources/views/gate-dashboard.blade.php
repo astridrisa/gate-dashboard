@@ -11,6 +11,11 @@
     $exPct   = $total > 0 ? round(((int) $kpi->exceptions) / $total * 100, 1) : 0;
     $deptMax = max((int) ($topDepartments->max('total') ?? 0), 1);
     $hasFilter = request()->filled('date') || request()->filled('device') || request()->filled('department');
+    // Peran akun: viewer hanya melihat; admin & superadmin boleh impor/hapus data
+    $roleId    = auth()->user()->role_id ?? null;     // 1 = superadmin, 2 = admin, 3 = viewer
+    $role      = \App\Support\GateRole::slug($roleId);
+    $roleLabel = \App\Support\GateRole::label($roleId);
+    $canManage = $roleId === null || in_array((int) $roleId, [\App\Support\GateRole::SUPERADMIN, \App\Support\GateRole::ADMIN], true);
 @endphp
 <!DOCTYPE html>
 <html lang="id">
@@ -19,6 +24,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Access Get Log</title>
     <link rel="icon" type="image/png" href="{{ asset('favicon-kemenkeu.png') }}?v=1">
+    <link rel="shortcut icon" href="{{ asset('favicon-kemenkeu.png') }}?v=1">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap" rel="stylesheet">
@@ -40,6 +46,24 @@
                 {{-- <div class="brand-sub">Analisis face recognition dan tap kartu</div> --}}
             </div>
         </div>
+
+        @auth
+            <div class="userbox">
+                <div class="u-name">{{ auth()->user()->name }}</div>
+                <span class="role role-{{ $role }}">{{ $roleLabel }}</span>
+                <div class="u-actions">
+                    @if ($role === 'superadmin' && \Illuminate\Support\Facades\Route::has('users.index'))
+                        <a class="btn line sm" href="{{ route('users.index') }}">Kelola akun</a>
+                    @endif
+                    @if (\Illuminate\Support\Facades\Route::has('logout'))
+                        <form method="POST" action="{{ route('logout') }}">
+                            @csrf
+                            <button class="btn line sm" type="submit">Keluar</button>
+                        </form>
+                    @endif
+                </div>
+            </div>
+        @endauth
 
         <h2>Filter data</h2>
         <form method="GET" action="{{ route('gate.dashboard') }}">
@@ -73,6 +97,7 @@
             @endif
         </form>
 
+        @if ($canManage)
         <div class="side-block">
             <h2>Impor file log</h2>
             <form method="POST" action="{{ route('gate.import') }}" enctype="multipart/form-data">
@@ -93,8 +118,9 @@
             </form>
             <p class="hint">Tap ganda dari orang, gate, dan event yang sama dalam kurang dari 5 detik digabung menjadi satu. File besar bisa butuh beberapa menit.</p>
         </div>
+        @endif
 
-        @if (\Illuminate\Support\Facades\Route::has('gate.clear'))
+        @if ($canManage && \Illuminate\Support\Facades\Route::has('gate.clear'))
         <div class="side-block">
             <h2>Kosongkan data</h2>
             <form method="POST" action="{{ route('gate.clear') }}" onsubmit="return confirm('Hapus SEMUA data log? Tindakan ini tidak bisa dibatalkan.')">
@@ -113,6 +139,10 @@
     <main class="main">
         <div class="top">
             <div>
+                @auth
+                    {{-- <p class="hello">Hello, {{ auth()->user()->name }}!</p> --}}
+                    <p class="hello">Hello, {{ \Illuminate\Support\Str::of(auth()->user()->name)->explode(' ')->first() }}!</p>
+                @endauth
                 <h1>Access Gate Analytics Dashboard</h1>
                 <p class="range">
                     @if ($filterDates->count() > 0)
@@ -197,8 +227,8 @@
                     <div class="s num">{{ $exPct }}% dari total tap</div>
                 </div>
                 {{-- <div>
-                    <div class="k">Tap ganda</div>
-                    <div class="v num bad">{{ $tapGanda !== null ? number_format($tapGanda) : '-' }}</div>
+                    <div class="k">Tap ganda digabung</div>
+                    <div class="v num">{{ $tapGanda === null ? '-' : number_format($tapGanda) }}</div>
                     <div class="s num">
                         @if ($tapGanda === null)
                             kolom jumlah tap tidak ditemukan

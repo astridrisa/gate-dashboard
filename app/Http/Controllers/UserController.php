@@ -63,6 +63,21 @@ class UserController extends Controller
         return back()->with('success', "Peran {$user->email} diubah menjadi " . GateRole::label($newRole) . '.');
     }
 
+    public function updateProfile(Request $request, User $user)
+    {
+        $data = $request->validate([
+            'name'  => ['required', 'string', 'max:100'],
+            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+        ], [], self::ATTRIBUTES);
+
+        $user->forceFill([
+            'name'  => $data['name'],
+            'email' => strtolower($data['email']),
+        ])->save();
+
+        return back()->with('success', "Data akun {$user->email} berhasil diperbarui.");
+    }
+
     public function updatePassword(Request $request, User $user)
     {
         $data = $request->validate([

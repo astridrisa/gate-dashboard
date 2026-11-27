@@ -32,6 +32,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [UserController::class, 'index'])->name('index');
         Route::post('/', [UserController::class, 'store'])->name('store');
         Route::patch('/{user}/role', [UserController::class, 'updateRole'])->name('role');
+        Route::patch('/{user}', [UserController::class, 'updateProfile'])->name('update');
         Route::patch('/{user}/password', [UserController::class, 'updatePassword'])->name('password');
         Route::delete('/{user}', [UserController::class, 'destroy'])->name('destroy');
     });

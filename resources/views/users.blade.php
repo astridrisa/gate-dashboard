@@ -141,6 +141,16 @@
                                     <button class="a-btn sm navy" type="submit">Simpan</button>
                                 </form>
 
+                                <details class="u-edit">
+                                    <summary class="a-btn sm ghost">Edit data</summary>
+                                    <form method="POST" action="{{ route('users.update', $u) }}">
+                                        @csrf @method('PATCH')
+                                        <input type="text" name="name" value="{{ $u->name }}" required maxlength="100" aria-label="Nama {{ $u->email }}">
+                                        <input type="email" name="email" value="{{ $u->email }}" required aria-label="Email {{ $u->email }}">
+                                        <button class="a-btn sm navy" type="submit">Simpan</button>
+                                    </form>
+                                </details>
+
                                 <details class="u-reset">
                                     <summary class="a-btn sm ghost">Reset sandi</summary>
                                     <form method="POST" action="{{ route('users.password', $u) }}">
@@ -179,6 +189,18 @@
                 if (ok) shown++;
             });
             empty.hidden = shown !== 0;
+        });
+    })();
+
+    // Hanya satu panel (Edit data / Reset sandi) terbuka per akun
+    (function () {
+        document.querySelectorAll('.u-tools details').forEach(function (d) {
+            d.addEventListener('toggle', function () {
+                if (!d.open) return;
+                d.parentElement.querySelectorAll('details').forEach(function (o) {
+                    if (o !== d) o.open = false;
+                });
+            });
         });
     })();
 </script>
